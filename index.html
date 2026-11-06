@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PWA Autofill</title>
+<meta name="description" content="Buka form Pre Work Assessment yang sudah terisi otomatis.">
+<meta name="theme-color" content="#5b4bdb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #f4f3fb; --card: #ffffff; --text: #1f1d2b; --muted: #6b6880;
+    --line: #e2e0ee; --accent: #5b4bdb; --accent-soft: #ebe8ff; --accent-text: #ffffff;
+    --warn-bg: #fff4e0; --warn-line: #f0b24a; --warn-text: #8a5a00;
+    --ok-bg: #e5f6ec; --ok-text: #17703f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15141c; --card: #201e2a; --text: #ecebf3; --muted: #a29fb6;
+      --line: #34313f; --accent: #8f82ff; --accent-soft: #2c2847; --accent-text: #15141c;
+      --warn-bg: #3a2c12; --warn-line: #b9822a; --warn-text: #f3c776;
+      --ok-bg: #173325; --ok-text: #6fdca1;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  main { max-width: 560px; margin: 0 auto; padding: 18px 16px 40px; }
+  header { margin-bottom: 14px; }
+  h1 { font-size: 22px; margin: 0; }
+  .date { color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  .label { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .who { font-weight: 600; }
+  .who-sub { color: var(--muted); font-size: 14px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-bottom: 14px; }
+  .seg button { font: inherit; font-size: 15px; padding: 11px 6px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); cursor: pointer; min-height: 46px; }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+  .chip { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--ok-bg); color: var(--ok-text); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-text); }
+  a.big { display: block; text-align: center; text-decoration: none; background: var(--accent); color: var(--accent-text);
+    font-weight: 700; font-size: 18px; padding: 16px; border-radius: 14px; }
+  a.big[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+  .hint { font-size: 13px; color: var(--muted); text-align: center; margin: 10px 0 0; }
+  .hint b { color: var(--text); }
+  details.card { padding: 0; }
+  details.card > summary { list-style: none; cursor: pointer; padding: 15px 16px; font-weight: 600; display: flex;
+    justify-content: space-between; align-items: center; min-height: 52px; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::after { content: "›"; font-size: 22px; color: var(--muted); transition: transform .15s; }
+  details.card[open] > summary::after { transform: rotate(90deg); }
+  .sum-note { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: auto; margin-right: 10px; }
+  .body { padding: 0 16px 16px; }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  label.q { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], select, textarea { width: 100%; padding: 11px 12px; font: inherit; font-size: 16px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-height: 46px; }
+  textarea { min-height: 60px; resize: vertical; }
+  select.bad { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-text); }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+  .checks label { display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 40px; }
+  .checks input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .off { opacity: .45; pointer-events: none; }
+  .err { font-size: 13px; color: var(--warn-text); margin-top: 4px; display: none; }
+  .err.show { display: block; }
+  button.plain { font: inherit; width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); cursor: pointer; min-height: 46px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  #setup[hidden], #home[hidden] { display: none; }
+  .small { font-size: 13px; color: var(--muted); }
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 999px; font-size: 14px; opacity: 0;
+    transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>PWA Autofill</h1>
+    <div class="date" id="today"></div>
+  </header>
+
+  <!-- Pengaturan awal: hanya muncul kalau NPP / No Polisi belum diisi -->
+  <section id="setup" class="card" hidden>
+    <h2>Pengaturan awal</h2>
+    <p class="small">Diisi sekali saja. Data ini hanya disimpan di HP ini.</p>
+    <div id="setupFields"></div>
+    <button class="plain primary" id="btnSetupSave" style="margin-top:6px">Simpan</button>
+  </section>
+
+  <div id="home" hidden>
+    <section class="card">
+      <p class="label">Pengisi</p>
+      <div class="who" id="who"></div>
+      <div class="who-sub" id="whoSub"></div>
+    </section>
+
+    <section class="card">
+      <p class="label">Jadwal masuk kerja</p>
+      <div class="seg" id="segShift"></div>
+      <p class="label">Mengoperasikan kendaraan hari ini?</p>
+      <div class="seg" id="segDrive"></div>
+      <div class="chips" id="chips"></div>
+      <a class="big" id="openForm" target="_blank" rel="noopener">Buka Form PWA</a>
+      <p class="hint">Di form: ketuk <b>Berikutnya</b>, isi <b>Odo Meter Awal</b>, cek, lalu <b>Kirim</b>.</p>
+    </section>
+
+    <details class="card">
+      <summary>Data diri &amp; kendaraan</summary>
+      <div class="body" id="secDiri"></div>
+    </details>
+    <details class="card">
+      <summary>Kesehatan <span class="sum-note" id="noteKes"></span></summary>
+      <div class="body" id="secKes"></div>
+    </details>
+    <details class="card" id="detP2H">
+      <summary>Checklist P2H <span class="sum-note" id="noteP2H"></span></summary>
+      <div class="body" id="secP2H"></div>
+    </details>
+    <details class="card">
+      <summary>Lainnya</summary>
+      <div class="body">
+        <p class="small">Semua jawaban tersimpan otomatis di HP ini. Odo Meter Awal selalu diisi manual di form.</p>
+        <button class="plain" id="btnReset">Kembalikan jawaban ke default</button>
+      </div>
+    </details>
+  </div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfdk6Q1bep1HYbycXqKSF0QXf8Czv1dd2-OjGTDkjDysHCWxQ/viewform";
+const FORM = {"kesehatan":[{"id":"43467977","title":"Isi NPP Karyawan (4 digit) / Mitra Id Bagde Number (2 huruf dan 6 angka tanpa spasi sesuai contoh)/ Visitor . Misalnya Pegawai NPP 7750 atau Mitra Kerja AM005209","type":"text","req":true,"options":[]},{"id":"687679504","title":"2. Nama Perusahaan","type":"radio","req":true,"options":["PT. ANTAM","PT. ADI KARI WISESA","PT. ALDZAMA","PT. ELABRAM","PT. DEWI JAYA","PT. ELNUSA PETROFINDO","PT. GEOSERVICE","PT. GIHON MARITSA","PT HIGH VOLT TECHNOLOGY","PT. INDMIRA","PT. JNP","PT. LUMOSO PRATAMA LINE","PT. HAGITA MANDIRI","PT. MENARA BRINT","PT. MYU","PT. PERDANA ABRISAM KUSUMA","PT. PKSS","PT SJS","PT. SMR","PT SSB","PT. SAPTA SARANA SEJAHTERA","PT. SUMBER LATUMBI","PT. SUPRA BAKTI MANDIRI","PT. TRI PUTRA JAYA","PT. KCI","Unit Geomin","Mitra Lainnya / Visitor /Temporary lainnya"]},{"id":"1074065079","title":"3.Jika Perusahaan tempat anda tidak ada dalam pilihan diatas, silahkan mengisi sesuai dengan nama perusahaannya secara lengkap (cth. PT.Sinar Maju Sejahtera).","type":"text","req":false,"options":[]},{"id":"942660387","title":"4. Jadwal masuk kerja","type":"radio","req":true,"options":["Shift 1 (Tenaga Full)","Shift 2","Shift 3"]},{"id":"1764130098","title":"5. Riwayat Penyakit diderita (dapat memilih lebih dari satu, geser kesamping)","type":"grid","req":true,"options":["Tidak Ada","Hipertensi","Diabetes Militus / Gula","Jantung","Kanker","Stroke","TB Paru","Asma"]},{"id":"94498585","title":"6. Tuliskan Riwayat Penyakit selain diatas (kosongkan jika tidak ada)","type":"text","req":false,"options":[]},{"id":"1664309346","title":"7. Apakah anda saat ini mengkonsumsi obat rutin sesuai izin dari dokter","type":"radio","req":true,"options":["Ya,  saya konsumsi obat rutin secara teratur","Tidak, saya lupa  konsumsi obat rutin","Tidak, saya tidak memiliki penyakit kronis sehingga tidak perlu minum obat"]},{"id":"74874894","title":"8. Apakah tidur anda cukup dengan berkualitas dan bangun dengan segar?","type":"radio","req":true,"options":["Ya","Tidak"]},{"id":"1005694803","title":"9. Berapa lama total anda tidur dalam 24 jam","type":"radio","req":true,"options":["Kurang dari 5 jam","Lebih dari 5 jam"]},{"id":"1032777068","title":"10. Adakah keluhan yang anda alami dibawah saat ini (dapat memilih lebih dari satu, geser kesamping)","type":"grid","req":true,"options":["Tidak ada keluhan","Sakit Kepala","Badan letih lemas","Gemetar","Sakit Tenggorokan","Nyeri pada badan atau anggota tubuh tertentu","Mual","Tidak Selera Makan","Susah Tidur","Demam","Batuk / Pilek"]},{"id":"2019209029","title":"11. Apakah kemarin/ semalam konsumsi minuman beralkohol","type":"radio","req":true,"options":["Ya, konsumsi","Tidak, tidak konsumsi"]},{"id":"918808168","title":"12. Apakah hari ini anda merasa sehat dan siap bekerja","type":"radio","req":true,"options":["Ya","Tidak"]},{"id":"1047515474","title":"13. Apakah hari ini anda akan mengoperasikan kendaraan mobil dinas / alat (LV/Alat berat)","type":"radio","req":true,"options":["Ya, akan mengendarakan","Tidak, tidak mengendarakan"]}],"pilih":[{"id":"1431842228","title":"Kendaraan yang akan dioperasikan","type":"radio","req":true,"options":["Kendaraan Ringan (Kendaraan Dinas/LV 4X4/ LV 4X2)","Truck (Dump/Water/Long/Bus)","Excavator (Mini/Biasa/ Long Arm)","Bulldozer","Wheel Loader/Grader","Forklift","Crane (Over Head/Mobile/Kapal)","Maaf tidak mengoperasikan kendaraan diatas"]}],"lv":[{"id":"30186745","title":"1. Jenis Kendaraan","type":"radio","req":true,"options":["Mini Bus (Avanza, Innova, Fortuner dan sejenisnya)","Single Cabin (LV 4X2 / 4X4)","Double Cabin (LV 4X4)"]},{"id":"374445047","title":"2. No Polisi (format contoh: DT XXXX WE)","type":"text","req":true,"options":[]},{"id":"1677099397","title":"3. Odo Meter Awal","type":"text","req":true,"options":[]},{"id":"468578893","title":"4. Panel Instrument / Dashboard","type":"radio","req":true,"options":["Baik","Tidak baik"]},{"id":"282279287","title":"5. Tanda Sign Belok (Kiri & Kanan)","type":"radio","req":true,"options":["Baik","Tidak baik"]},{"id":"844587743","title":"6. Lampu Depan","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1701238618","title":"7. Lampu Belakang","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"163764651","title":"8. Lampu Stop (Rem)","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1543177254","title":"9. Lampu Hazard / Bahaya","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1277494837","title":"10. Level Oli Mesin","type":"radio","req":true,"options":["Cukup","Kurang"]},{"id":"1056196729","title":"11. Level Air Radiator","type":"radio","req":true,"options":["Cukup","Kurang"]},{"id":"1860065891","title":"12. Level Air Pembersih Kaca","type":"radio","req":true,"options":["Cukup","Kurang"]},{"id":"834756665","title":"13. Level Oli Power Steering (Hydraulic Power Steering)/ kondisi Electric Power Steering EPS(Tidak memakai oli)","type":"radio","req":true,"options":["Cukup / Normal","Kurang / Tidak Normal"]},{"id":"46743776","title":"14. Level Oli Rem","type":"radio","req":true,"options":["Cukup","Kurang"]},{"id":"329104761","title":"15. Kondisi Accu / Aki","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1163139798","title":"16. Tali Kipas / Fan Belt","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1677779099","title":"17. Rem Parkir (rem tangan)","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"195442200","title":"18. Rem Utama","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1071485613","title":"19. Pembersih kaca depan & Belakang ( Wiper)","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1088051","title":"20. Getaran Pada Kemudi (steering)","type":"radio","req":true,"options":["Normal","Tidak Normal"]},{"id":"1526457523","title":"21. Suspensi/Kebisingan/Tekanan","type":"radio","req":true,"options":["Normal","Tidak Normal"]},{"id":"185351546","title":"22. Tabung Pemadam Kebakaran (APAR)","type":"radio","req":true,"options":["Ada /Normal","Tidak Ada / Tidak Normal"]},{"id":"11169683","title":"23. Kondisi Sabuk Pengaman","type":"radio","req":true,"options":["Ada","Tidak Ada"]},{"id":"2014475467","title":"24. Fungsi Sabuk Pengaman","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"889971095","title":"25. Kondisi Kaca Depan","type":"radio","req":true,"options":["Baik","Tidak baik"]},{"id":"1471794264","title":"26. Kondisi Kaca Spion","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1917843191","title":"27. Fungsi Alarm Mundur","type":"radio","req":true,"options":["Normal","Tidak Normal"]},{"id":"1328630107","title":"28. Klakson/ Horn","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"1322107525","title":"29. Kotak P3K","type":"radio","req":true,"options":["Ada","Tidak Ada"]},{"id":"902458123","title":"30. Segitiga Pengaman (Reflektif Triangle)","type":"radio","req":true,"options":["Ada","Tidak Ada"]},{"id":"1737420704","title":"31. Roda Cadangan / Ban Serep","type":"radio","req":true,"options":["Ada","Tidak Ada"]},{"id":"1721043536","title":"32. Peralatan Pengganti Ban (kunci roda, dongkrak)","type":"radio","req":true,"options":["Ada","Tidak ada"]},{"id":"1466575055","title":"33. Baut Roda","type":"radio","req":true,"options":["Kencang","Longgar"]},{"id":"436626813","title":"34. Kondisi Body Mobil","type":"radio","req":true,"options":["Baik","Tidak Baik"]},{"id":"2026093353","title":"35. Kebersihan dalam Mobil","type":"radio","req":true,"options":["Bersih","Tidak bersih"]},{"id":"788103678","title":"36. Kebersihan luar Mobil","type":"radio","req":true,"options":["Bersih","Tidak Bersih"]},{"id":"770982824","title":"37. Kondisi Pengoperasian","type":"radio","req":true,"options":["Layak dioperasikan","Ada Kekurangan namun dapat dioperasikan","Tidak layak dioperasikan"]},{"id":"1290783511","title":"Catatan","type":"text","req":false,"options":[]}]};
+const DEFAULTS = {"43467977":"","687679504":"PT. ANTAM","1074065079":"","942660387":"Shift 1 (Tenaga Full)","1764130098":["Tidak Ada"],"94498585":"","1664309346":"Tidak, saya tidak memiliki penyakit kronis sehingga tidak perlu minum obat","74874894":"Ya","1005694803":"Lebih dari 5 jam","1032777068":["Tidak ada keluhan"],"2019209029":"Tidak, tidak konsumsi","918808168":"Ya","1047515474":"Ya, akan mengendarakan","1431842228":"Kendaraan Ringan (Kendaraan Dinas/LV 4X4/ LV 4X2)","30186745":"Mini Bus (Avanza, Innova, Fortuner dan sejenisnya)","374445047":"","1677099397":"","1290783511":"","468578893":"Baik","282279287":"Baik","844587743":"Baik","1701238618":"Baik","163764651":"Baik","1543177254":"Baik","1277494837":"Cukup","1056196729":"Cukup","1860065891":"Cukup","834756665":"Cukup / Normal","46743776":"Cukup","329104761":"Baik","1163139798":"Baik","1677779099":"Baik","195442200":"Baik","1071485613":"Baik","1088051":"Normal","1526457523":"Normal","185351546":"Ada /Normal","11169683":"Ada","2014475467":"Baik","889971095":"Baik","1471794264":"Baik","1917843191":"Normal","1328630107":"Baik","1322107525":"Ada","902458123":"Ada","1737420704":"Ada","1721043536":"Ada","1466575055":"Kencang","436626813":"Baik","2026093353":"Bersih","788103678":"Bersih","770982824":"Layak dioperasikan"};
+const ID = {
+  npp: "43467977", company: "687679504", companyOther: "1074065079", shift: "942660387",
+  disease: "1764130098", complaint: "1032777068", drive: "1047515474", vehicle: "1431842228",
+  lvType: "30186745", plate: "374445047", odo: "1677099397", lvNote: "1290783511"
+};
+const DRIVE_YES = "Ya, akan mengendarakan";
+const VEH_LV = "Kendaraan Ringan (Kendaraan Dinas/LV 4X4/ LV 4X2)";
+const STORE_KEY = "pwa-autofill-app-v1";
+
+const byId = {};
+for (const page of Object.values(FORM)) for (const q of page) byId[q.id] = q;
+const clone = o => JSON.parse(JSON.stringify(o));
+
+let state = clone(DEFAULTS);
+function loadState() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) {}
+  state = clone(DEFAULTS);
+  if (saved && typeof saved === "object") applyValues(saved);
+}
+function applyValues(obj) {
+  for (const [k, v] of Object.entries(obj)) {
+    const q = byId[k];
+    if (!q) continue;
+    if (q.type === "grid") { if (Array.isArray(v)) state[k] = v.filter(x => q.options.includes(x)); }
+    else if (q.type === "radio") { if (q.options.includes(v)) state[k] = v; }
+    else if (typeof v === "string") state[k] = v;
+  }
+}
+function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+// QR pengaturan: #npp=...&nopol=... (bagian setelah # tidak pernah dikirim ke server)
+function readSetupHash() {
+  if (!location.hash || location.hash.length < 2) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  let got = false;
+  if (p.get("npp")) { state[ID.npp] = p.get("npp").trim(); got = true; }
+  if (p.get("nopol")) { state[ID.plate] = p.get("nopol").trim().toUpperCase(); got = true; }
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  if (got) { saveState(); toast("Data NPP & No Polisi tersimpan"); }
+}
+
+function el(tag, attrs = {}, kids = []) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "text") n.textContent = v; else n.setAttribute(k, v); }
+  for (const c of kids) n.appendChild(c);
+  return n;
+}
+
+function fieldFor(q, opts = {}) {
+  const wrap = el("div", { class: "field" });
+  const title = opts.title || q.title;
+  wrap.appendChild(el("label", { class: "q", for: "f-" + q.id, text: title }));
+  if (q.type === "radio") {
+    const s = el("select", { id: "f-" + q.id });
+    for (const o of q.options) s.appendChild(el("option", { value: o, text: o }));
+    s.value = state[q.id] ?? q.options[0];
+    const mark = () => s.classList.toggle("bad", !!opts.markBad && s.value !== q.options[0]);
+    mark();
+    s.addEventListener("change", () => { state[q.id] = s.value; mark(); changed(); });
+    wrap.appendChild(s);
+  } else if (q.type === "grid") {
+    const box = el("div", { class: "checks" });
+    for (const o of q.options) {
+      const cb = el("input", { type: "checkbox", value: o });
+      cb.checked = (state[q.id] || []).includes(o);
+      cb.addEventListener("change", () => {
+        const cur = new Set(state[q.id] || []);
+        cb.checked ? cur.add(o) : cur.delete(o);
+        state[q.id] = q.options.filter(x => cur.has(x));
+        changed();
+      });
+      box.appendChild(el("label", {}, [cb, document.createTextNode(o)]));
+    }
+    wrap.appendChild(box);
+  } else {
+    const inp = opts.multiline
+      ? el("textarea", { id: "f-" + q.id })
+      : el("input", { type: "text", id: "f-" + q.id, autocomplete: "off", inputmode: opts.inputmode || "text" });
+    if (opts.placeholder) inp.placeholder = opts.placeholder;
+    inp.value = state[q.id] || "";
+    inp.addEventListener("input", () => { state[q.id] = opts.upper ? inp.value.toUpperCase() : inp.value; changed(false); });
+    if (opts.upper) inp.addEventListener("blur", () => { inp.value = state[q.id] || ""; });
+    wrap.appendChild(inp);
+    if (opts.validate) {
+      const err = el("div", { class: "err", text: opts.validateMsg });
+      const check = () => err.classList.toggle("show", inp.value.trim() !== "" && !opts.validate(inp.value.trim()));
+      inp.addEventListener("input", check); check();
+      wrap.appendChild(err);
+    }
+  }
+  return wrap;
+}
+
+const nppOk = v => /^(\d{4}|[A-Za-z]{2}\d{6})$/.test(v);
+const nppField = () => fieldFor(byId[ID.npp], {
+  title: "NPP (4 angka) / Mitra ID Badge (2 huruf + 6 angka)", inputmode: "text", placeholder: "contoh: 7750 atau AM005209",
+  validate: nppOk, validateMsg: "Format: 4 angka (7750) atau 2 huruf + 6 angka (AM005209)."
+});
+const plateField = () => fieldFor(byId[ID.plate], { title: "No Polisi kendaraan", placeholder: "contoh: DT 1234 AB", upper: true });
+
+function segmented(container, qid, items) {
+  container.innerHTML = "";
+  for (const [label, value] of items) {
+    const b = el("button", { type: "button", text: label, "aria-pressed": String(state[qid] === value) });
+    b.addEventListener("click", () => { state[qid] = value; renderHome(); changed(); });
+    container.appendChild(b);
+  }
+}
+
+function renderSetup() {
+  const box = document.getElementById("setupFields");
+  box.innerHTML = "";
+  box.appendChild(nppField());
+  box.appendChild(fieldFor(byId[ID.company], { title: "Nama Perusahaan" }));
+  box.appendChild(plateField());
+  box.appendChild(fieldFor(byId[ID.lvType], { title: "Jenis kendaraan" }));
+}
+
+function renderHome() {
+  document.getElementById("who").textContent = "NPP " + (state[ID.npp] || "-") + " · " + (state[ID.company] || "");
+  const driving = state[ID.drive] === DRIVE_YES;
+  const lv = driving && state[ID.vehicle] === VEH_LV;
+  document.getElementById("whoSub").textContent = lv
+    ? (state[ID.plate] || "No Polisi belum diisi") + " · " + (state[ID.lvType] || "").split(" (")[0]
+    : (driving ? "Kendaraan: " + (state[ID.vehicle] || "").split(" (")[0] + " (diisi manual di form)" : "Tidak mengemudi hari ini");
+
+  segmented(document.getElementById("segShift"), ID.shift,
+    byId[ID.shift].options.map(o => [o.replace(" (Tenaga Full)", ""), o]));
+  segmented(document.getElementById("segDrive"), ID.drive,
+    [["Ya", DRIVE_YES], ["Tidak", byId[ID.drive].options[1]]]);
+
+  // Ringkasan
+  const chips = document.getElementById("chips");
+  chips.innerHTML = "";
+  const kesIssues = healthIssues();
+  chips.appendChild(el("span", { class: "chip" + (kesIssues ? " warn" : ""), text: kesIssues ? "Kesehatan: " + kesIssues + " perlu dicek" : "Sehat, tidak ada keluhan" }));
+  if (lv) {
+    const bad = p2hBad();
+    chips.appendChild(el("span", { class: "chip" + (bad ? " warn" : ""), text: bad ? bad + " item P2H bermasalah" : "Semua item P2H baik" }));
+  }
+  document.getElementById("noteKes").textContent = kesIssues ? kesIssues + " perlu dicek" : "";
+  document.getElementById("noteP2H").textContent = lv ? (p2hBad() ? p2hBad() + " bermasalah" : "semua baik") : "tidak dipakai";
+  document.getElementById("detP2H").classList.toggle("off", !lv);
+
+  const link = document.getElementById("openForm");
+  link.href = buildLink();
+  const nppMissing = !(state[ID.npp] || "").trim();
+  link.setAttribute("aria-disabled", String(nppMissing));
+}
+
+function healthIssues() {
+  let n = 0;
+  const kes = FORM.kesehatan;
+  for (const q of kes) {
+    if (q.type === "grid") {
+      const v = state[q.id] || [];
+      if (!(v.length === 1 && v[0] === q.options[0])) n++;
+    }
+  }
+  const good = { "74874894": "Ya", "1005694803": "Lebih dari 5 jam", "2019209029": "Tidak, tidak konsumsi", "918808168": "Ya" };
+  for (const [k, v] of Object.entries(good)) if (state[k] !== v) n++;
+  return n;
+}
+function p2hBad() {
+  return FORM.lv.filter(q => q.type === "radio" && q.id !== ID.lvType && state[q.id] !== q.options[0]).length;
+}
+
+function renderSections() {
+  const diri = document.getElementById("secDiri"); diri.innerHTML = "";
+  diri.appendChild(nppField());
+  diri.appendChild(fieldFor(byId[ID.company], { title: "Nama Perusahaan" }));
+  diri.appendChild(fieldFor(byId[ID.companyOther], { title: "Nama perusahaan lain (kalau tidak ada di daftar)" }));
+  diri.appendChild(fieldFor(FORM.pilih[0], { title: "Kendaraan yang dioperasikan" }));
+  diri.appendChild(fieldFor(byId[ID.lvType], { title: "Jenis kendaraan (Kendaraan Ringan)" }));
+  diri.appendChild(plateField());
+
+  const kes = document.getElementById("secKes"); kes.innerHTML = "";
+  for (const q of FORM.kesehatan) {
+    if ([ID.npp, ID.company, ID.companyOther, ID.shift, ID.drive].includes(q.id)) continue;
+    kes.appendChild(fieldFor(q, { multiline: q.type === "text" }));
+  }
+
+  const p2h = document.getElementById("secP2H"); p2h.innerHTML = "";
+  for (const q of FORM.lv) {
+    if ([ID.lvType, ID.plate, ID.odo].includes(q.id)) continue;
+    p2h.appendChild(fieldFor(q, { markBad: q.type === "radio", multiline: q.type === "text" }));
+  }
+}
+
+function buildLink() {
+  const parts = ["usp=pp_url"];
+  const enc = v => encodeURIComponent(v).replace(/%20/g, "+").replace(/%2C/gi, ",").replace(/%2F/gi, "/");
+  const add = (id, v) => parts.push("entry." + id + "=" + enc(v));
+  const addQ = q => {
+    if (q.id === ID.odo) return;
+    const v = state[q.id];
+    if (q.type === "grid") { for (const x of (v || [])) add(q.id, x); }
+    else if (typeof v === "string" && v.trim() !== "") add(q.id, v.trim());
+  };
+  FORM.kesehatan.forEach(addQ);
+  if (state[ID.drive] === DRIVE_YES) {
+    FORM.pilih.forEach(addQ);
+    if (state[ID.vehicle] === VEH_LV) FORM.lv.forEach(addQ);
+  }
+  return FORM_URL + "?" + parts.join("&");
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
+}
+let rerenderTimer;
+function changed(rerender = true) {
+  saveState();
+  if (rerender) renderHome();
+  else { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(renderHome, 250); }
+}
+
+function needsSetup() { return !(state[ID.npp] || "").trim() || !(state[ID.plate] || "").trim(); }
+function show() {
+  const setup = needsSetup();
+  document.getElementById("setup").hidden = !setup;
+  document.getElementById("home").hidden = setup;
+  if (setup) renderSetup(); else { renderHome(); renderSections(); }
+}
+
+document.getElementById("btnSetupSave").onclick = () => {
+  const npp = (state[ID.npp] || "").trim();
+  if (!nppOk(npp)) { toast("Cek format NPP dulu"); return; }
+  if (!(state[ID.plate] || "").trim()) { toast("No Polisi belum diisi"); return; }
+  saveState(); show(); toast("Tersimpan");
+};
+document.getElementById("btnReset").onclick = () => {
+  if (!confirm("Kembalikan semua jawaban ke default? NPP dan No Polisi tetap disimpan.")) return;
+  const keep = { [ID.npp]: state[ID.npp], [ID.plate]: state[ID.plate], [ID.company]: state[ID.company] };
+  state = clone(DEFAULTS); Object.assign(state, keep);
+  saveState(); show(); toast("Kembali ke default");
+};
+
+document.getElementById("today").textContent =
+  new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+loadState();
+readSetupHash();
+show();
+
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
